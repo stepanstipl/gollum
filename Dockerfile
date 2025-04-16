@@ -1,15 +1,15 @@
-FROM ruby:3.3-alpine AS builder
+FROM ruby:3.4.3-slim AS builder
 
-RUN apk add --update \
-            --no-cache \
-            build-base \
+RUN apt-get update \
+    && apt-get install -y \
+            build-essential \
             cmake \
             git \
-            icu-dev \
-            openssl-dev \
-            yaml-dev \
-    && rm -rf /var/cache/apk/*
-
+            libicu-dev \
+            libssl-dev \
+            libyaml-dev \
+            pkg-config \
+    && apt-get clean
 COPY Gemfile* /tmp/
 COPY gollum.gemspec* /tmp/
 WORKDIR /tmp
@@ -17,6 +17,7 @@ RUN bundle install
 
 RUN gem install \
     asciidoctor \
+    commonmarker \
     creole \
     wikicloth \
     org-ruby \
@@ -28,7 +29,7 @@ WORKDIR /app
 COPY . /app
 RUN bundle exec rake install
 
-FROM ruby:3.3-alpine
+FROM ruby:3.4.3-slim
 
 ARG UID=1000
 ARG GID=1000
@@ -36,22 +37,22 @@ ARG GID=1000
 COPY --from=builder /usr/local/bundle/ /usr/local/bundle/
 
 WORKDIR /wiki
-RUN apk add --update \
-            --no-cache \
+RUN apt-get update \
+    && apt-get install -y \
             bash \
             git \
-            libc6-compat \
-            openssh \
-            shadow \
-    && rm -rf /var/cache/apk/* \
+            openssh-client \
+    && apt-get clean \
     && groupmod -g $GID www-data \
-    && adduser -u $UID -S www-data -G www-data \
-    && git config --file /home/www-data/.gitconfig --add safe.directory /wiki \
-    && chown www-data:www-data /home/www-data/.gitconfig
+    && usermod -u $UID -g www-data www-data \
+    && mkdir -p /var/www \
+    && git config --file /var/www/.gitconfig --add safe.directory /wiki \
+    && chown -R www-data:www-data /var/www
 
 COPY docker-run.sh /docker-run.sh
+COPY config.rb /etc/gollum/config.rb
 RUN chmod +x /docker-run.sh
 USER www-data
 VOLUME /wiki
 
-ENTRYPOINT ["/docker-run.sh"]
+ENTRYPOINT ["/docker-run.sh", "--config", "/etc/gollum/config.rb", "--css"]

@@ -1,4 +1,5 @@
 #!/bin/bash
+[[ "${DEBUG}" == "true" ]] && set -x
 
 # Check if /wiki directory exists and is writable
 if [ ! -d "/wiki" ] || [ ! -w "/wiki" ]; then
